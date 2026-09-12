@@ -24,14 +24,14 @@
     b.setAttribute('aria-label',`${['Circle','Triangle','Diamond','Square','Hexagon','Crescent'][id]}, ${count} of 6 placed`);
     b.querySelectorAll('.slots i').forEach((dot,i)=>dot.classList.toggle('used',i<count));
     });toolButtons.forEach(b=>{b.classList.toggle('active',b.dataset.tool===tool);b.setAttribute('aria-pressed',String(b.dataset.tool===tool));});canvas.style.cursor=tool==='move'?'grab':'crosshair';}
-  function chooseShape(id){selected=id;tool='move';syncTray();status(world.tokens.filter(o=>o.id===id).length===6?'All six copies are placed. Drag an existing copy to move it.':'Place another copy anywhere in the world.');}
+  function chooseShape(id){selected=id;tool='place';syncTray();status(world.tokens.filter(o=>o.id===id).length===6?'All six copies are placed. Select Move to move an existing copy.':'Place another copy anywhere in the world.');}
   function chooseTool(next){tool=next;selected=null;syncTray();status(({move:'Drag a shape to move its next discovery.',line:'Draw a line. A new path through their world.',ladder:'Draw between two heights. A way to climb.',spring:'Draw a line. See how high they fly.'})[next]);}
-  function commitShape(id,x,y){const placed=world.place(id,x,y);syncTray();status(placed?'Something is stirring. Give it a moment.':'All six copies are placed. Drag an existing copy to move it.');}
+  function commitShape(id,x,y){const placed=world.place(id,x,y);syncTray();status(placed?'Something is stirring. Give it a moment.':world.placementBlocked(x,y)?'A little person is here. Try another spot.':'All six copies are placed. Select Move to move an existing copy.');}
   function shapePath(id,r){ctx.beginPath();if(id===0)ctx.arc(0,0,r,0,Math.PI*2);else if(id===5){ctx.arc(0,0,r,Math.PI*.32,Math.PI*1.68);ctx.bezierCurveTo(-r*.6,-r*.7,-r*.6,r*.7,Math.cos(Math.PI*.32)*r,Math.sin(Math.PI*.32)*r);}else{const n=({1:3,2:4,3:4,4:6})[id],offset=id===3?Math.PI/4:-Math.PI/2;for(let i=0;i<n;i++){const a=i/n*Math.PI*2+offset,x=Math.cos(a)*r,y=Math.sin(a)*r;i?ctx.lineTo(x,y):ctx.moveTo(x,y);}ctx.closePath();}}
   function drawToken(o){const held=gesture?.type==='token'&&gesture.uid===o.uid;const x=held?gesture.x:o.x,y=held?gesture.y:o.y;ctx.save();ctx.translate(x,y);
     const pulse=1+Math.sin(world.time*1.8+o.id)*.05;ctx.scale(pulse,pulse);glow(0,0,42,'#d8c6a51a');
     if(selected===o.id)ring(0,0,28,28,'#e7d7b93d');
-    ctx.strokeStyle='#e4d9c6';ctx.lineWidth=1.25;ctx.fillStyle='#181d26d9';shapePath(o.id,17);ctx.fill();ctx.stroke();
+    ctx.strokeStyle=held&&world.placementBlocked(x,y)?'#ed9c97':'#e4d9c6';ctx.lineWidth=1.25;ctx.fillStyle='#181d26d9';shapePath(o.id,17);ctx.fill();ctx.stroke();
     ctx.strokeStyle='#d6b98e65';ctx.lineWidth=1;ctx.beginPath();ctx.arc(0,0,23,-Math.PI/2,-Math.PI/2+Math.PI*2*(1-o.timer/o.period));ctx.stroke();
     ellipse(0,0,1.3,1.3,'#f5dfbc');ctx.restore();
   }
@@ -103,8 +103,8 @@
     for(let i=0;i<80;i++){const x=noise(i+19)*W;stroke([[x,world.ground+3],[x+noise(i)*6,world.ground+5]],'#bbb3a322',.6);}
     world.lines.forEach(l=>drawLine(l));effects.forEach(drawEffect);world.people.forEach(drawPerson);world.tokens.forEach(drawToken);
     if(gesture?.type==='draw')drawLine({kind:tool,x1:gesture.startX,y1:gesture.startY,x2:gesture.x,y2:gesture.y},true);
-    if(gesture?.type==='new'){ctx.save();ctx.translate(gesture.x,gesture.y);ctx.strokeStyle='#eddbc0';ctx.lineWidth=1;shapePath(gesture.id,17);ctx.stroke();ctx.restore();}
-    else if(pointer&&selected!==null&&!gesture&&pointer.y>85&&pointer.y<world.ground){ctx.globalAlpha=.25;ctx.save();ctx.translate(pointer.x,pointer.y);ctx.strokeStyle='#eddbc0';shapePath(selected,17);ctx.stroke();ctx.restore();ctx.globalAlpha=1;}
+    if(gesture?.type==='new'){ctx.save();ctx.translate(gesture.x,gesture.y);ctx.strokeStyle=world.placementBlocked(gesture.x,gesture.y)?'#ed9c97':'#eddbc0';ctx.lineWidth=1;shapePath(gesture.id,17);ctx.stroke();ctx.restore();}
+    else if(pointer&&tool==='place'&&selected!==null&&!gesture&&pointer.y>85&&pointer.y<world.ground){ctx.globalAlpha=.25;ctx.save();ctx.translate(pointer.x,pointer.y);ctx.strokeStyle=world.placementBlocked(pointer.x,pointer.y)?'#ed9c97':'#eddbc0';shapePath(selected,17);ctx.stroke();ctx.restore();ctx.globalAlpha=1;}
   }
   function frame(now){const elapsed=last?Math.min((now-last)/1000,.1):0;last=now;
     if(!paused){accumulator+=elapsed;while(accumulator>=1/60){world.update(1/60);world.drainEvents().forEach(emit);for(const e of effects)e.age+=1/60;effects=effects.filter(e=>e.age<e.life);accumulator-=1/60;}}
@@ -113,15 +113,15 @@
   function point(e){const r=canvas.getBoundingClientRect();return {x:e.clientX-r.left,y:e.clientY-r.top};}
   function inWorld(p){return p.x>=12&&p.x<=W-12&&p.y>=85&&p.y<=world.ground;}
   canvas.addEventListener('pointerdown',e=>{if(gesture||e.isPrimary===false)return;const p=point(e);if(!inWorld(p))return;canvas.setPointerCapture(e.pointerId);
+    if(tool==='place'){commitShape(selected,p.x,p.y);return;}
     if(tool!=='move'){gesture={type:'draw',startX:p.x,startY:p.y,...p,pointerId:e.pointerId};return;}
     const token=[...world.tokens].reverse().find(o=>Math.hypot(o.x-p.x,o.y-p.y)<28);
     if(token){selected=token.id;syncTray();gesture={type:'token',id:token.id,uid:token.uid,x:token.x,y:token.y,dx:token.x-p.x,dy:token.y-p.y,pointerId:e.pointerId};}
-    else if(selected!==null){commitShape(selected,p.x,p.y);}
     else status('Choose one of the six shapes below, or draw a way up.');
   });
   canvas.addEventListener('pointermove',e=>{pointer=point(e);if(gesture&&gesture.pointerId===e.pointerId){gesture.x=clamp(pointer.x+(gesture.dx||0),20,W-20);gesture.y=clamp(pointer.y+(gesture.dy||0),88,world.ground-5);}});
   canvas.addEventListener('pointerup',e=>{if(!gesture||gesture.pointerId!==e.pointerId)return;
-    if(gesture.type==='token'){world.move(gesture.uid,gesture.x,gesture.y);syncTray();status('The shape has moved.');}
+    if(gesture.type==='token'){const moved=world.move(gesture.uid,gesture.x,gesture.y);syncTray();status(moved?'The shape has moved.':'A little person is here. The shape stayed in its original spot.');}
     if(gesture.type==='draw'){const g=gesture;if(world.addLine(tool,g.startX,g.startY,g.x,g.y))status('A new possibility for their little lives.');else status(world.lines.length>=30?'A full world. Undo a line to make room.':'Drag a little farther to draw a line.');}
     gesture=null;
   });

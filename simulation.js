@@ -42,15 +42,25 @@
     snapshot(){this.history.push({tokens:this.tokens.map(o=>({...o})),lines:this.lines.map(l=>({...l}))});if(this.history.length>50)this.history.shift();}
     place(id,x,y) {
       if(!Number.isInteger(id)||id<0||id>5)return;
-      if(this.tokens.filter(o=>o.id===id).length>=6)return;
+      if(this.tokens.filter(o=>o.id===id).length>=6||this.placementBlocked(x,y))return;
       this.snapshot();const o={id,uid:++this.nextId,period:9+id*1.7,cycle:0};this.tokens.push(o);
       this.positionToken(o,x,y);return o;
+    }
+    placementBlocked(x,y) {
+      // Only people's bodies block a shape, never other shapes or their art.
+      x=clamp(x,24,this.width-24);y=clamp(y,88,this.ground-25);
+      return this.people.some(p=>{
+        const s=p.size*(this.width<700?.75:.92);
+        const nearestX=clamp(x,p.x-7*s,p.x+7*s);
+        const nearestY=clamp(y,p.y-27*s,p.y+2*s);
+        return Math.hypot(x-nearestX,y-nearestY)<19;
+      });
     }
     positionToken(o,x,y) {
       o.x=clamp(x,24,this.width-24);o.y=clamp(y,88,this.ground-25);o.timer=.55;
     }
     move(uid,x,y) {
-      const o=this.tokens.find(o=>o.uid===uid);if(!o)return;
+      const o=this.tokens.find(o=>o.uid===uid);if(!o||this.placementBlocked(x,y))return;
       this.snapshot();this.positionToken(o,x,y);return o;
     }
     addLine(kind,x1,y1,x2,y2) {

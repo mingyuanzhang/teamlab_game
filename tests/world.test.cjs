@@ -44,3 +44,22 @@ for(const [width,height] of [[1440,900],[390,844]])test(`ten minutes of physics 
   w.update(1/60);if(i%60===0)w.drainEvents();for(const p of w.people){states.add(p.state);assert.ok(Number.isFinite(p.x)&&Number.isFinite(p.y)&&Number.isFinite(p.vy));assert.ok(p.y<=w.ground+.01);assert.ok(p.x>=0&&p.x<=w.width);}
   assert.ok(w.tokens.length<=36);assert.ok(w.events.length<=72);
 }assert.ok(states.has('climb'));assert.ok(states.has('jump'));assert.ok(states.has('fall'));});
+
+test('shapes can share an origin before and during active discovery cycles',()=>{
+  const w=create();const a=w.place(0,250,150),b=w.place(0,250,150);assert.ok(a&&b);
+  advance(w,.6);assert.equal(w.drainEvents().length,2);
+  const c=w.place(1,250,150);assert.ok(c);assert.equal(w.tokens.length,3);
+  const d=w.place(2,350,150);assert.ok(w.move(d.uid,250,150));
+  assert.ok(w.tokens.every(o=>o.x===250&&o.y===150));
+});
+
+for(const width of [1200,390])test(`only people block placement and moves at ${width}px`,()=>{
+  const w=create(width,800);w.people.forEach(p=>{p.x=width-30;p.y=w.ground;});
+  const token=w.place(0,100,130),person=w.people[0];person.x=180;person.y=240;
+  const history=w.history.length;assert.ok(w.placementBlocked(180,230));
+  assert.equal(w.place(1,180,230),undefined);assert.equal(w.tokens.length,1);
+  assert.equal(w.move(token.uid,180,230),undefined);assert.equal(token.x,100);assert.equal(token.y,130);assert.equal(w.history.length,history);
+  // Check the full shape footprint, not just whether its center hits a person.
+  assert.ok(w.placementBlocked(200,230));assert.ok(!w.placementBlocked(215,230));
+  person.x=width-30;assert.ok(w.place(1,180,230));assert.ok(w.move(token.uid,180,230));
+});
