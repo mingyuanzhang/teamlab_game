@@ -42,10 +42,16 @@
     snapshot(){this.history.push({tokens:this.tokens.map(o=>({...o})),lines:this.lines.map(l=>({...l}))});if(this.history.length>50)this.history.shift();}
     place(id,x,y) {
       if(!Number.isInteger(id)||id<0||id>5)return;
-      this.snapshot();let o=this.tokens.find(o=>o.id===id);
-      if(!o){o={id,period:9+id*1.7,cycle:0};this.tokens.push(o);}
+      if(this.tokens.filter(o=>o.id===id).length>=6)return;
+      this.snapshot();const o={id,uid:++this.nextId,period:9+id*1.7,cycle:0};this.tokens.push(o);
+      this.positionToken(o,x,y);return o;
+    }
+    positionToken(o,x,y) {
       o.x=clamp(x,24,this.width-24);o.y=clamp(y,88,this.ground-25);o.timer=.55;
-      return o;
+    }
+    move(uid,x,y) {
+      const o=this.tokens.find(o=>o.uid===uid);if(!o)return;
+      this.snapshot();this.positionToken(o,x,y);return o;
     }
     addLine(kind,x1,y1,x2,y2) {
       if(!['line','ladder','spring'].includes(kind)||Math.hypot(x2-x1,y2-y1)<24||this.lines.length>=30)return false;
@@ -74,11 +80,11 @@
       if(!Number.isFinite(dt)||dt<=0)return;
       // Bound both integration and emitter work after a background-tab delay.
       dt=Math.min(dt,.05);this.time+=dt;
-      for(const o of this.tokens){o.timer-=dt;if(o.timer<=0){o.timer=o.period;o.cycle++;this.events.push({id:o.id,x:o.x,y:o.y,cycle:o.cycle});
+      for(const o of this.tokens){o.timer-=dt;if(o.timer<=0){o.timer=o.period;o.cycle++;this.events.push({id:o.id,tokenId:o.uid,x:o.x,y:o.y,cycle:o.cycle});
         for(const p of this.people){if(Math.hypot(p.x-o.x,p.y-o.y)<170){p.expression=3;if(p.trait.name==='shy'){p.direction=p.x<o.x?-1:1;}else if(this.random()<.6){p.direction=p.x<o.x?1:-1;p.rest=this.range(.5,2);}}}
       }}
       // A consumer that is absent or paused cannot accumulate unbounded events.
-      if(this.events.length>24)this.events.splice(0,this.events.length-24);
+      if(this.events.length>72)this.events.splice(0,this.events.length-72);
       for(const l of this.lines)l.pulse=Math.max(0,l.pulse-dt);
       for(const p of this.people)this.updatePerson(p,dt);
     }

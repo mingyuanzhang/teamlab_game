@@ -15,7 +15,23 @@ test('ladders take people from ground to a higher platform',()=>{const w=create(
 
 test('removing a ladder during a climb releases the climber safely',()=>{const w=create();w.lines=[];w.addLine('ladder',200,w.ground,200,200);const p=w.people[0];Object.assign(p,{x:200,y:350,ladder:w.lines[0].id,climbUp:true,support:null,state:'climb'});w.undo();assert.equal(p.ladder,null);advance(w,3);assert.equal(p.support,'ground');});
 
-test('only six mystery objects exist, moving one resets its timer and origin',()=>{const w=create();assert.equal(w.tokens.length,0);for(let id=0;id<6;id++)w.place(id,100+id*100,200);w.place(6,20,100);assert.equal(w.tokens.length,6);advance(w,.4);assert.equal(w.drainEvents().length,0);advance(w,.2);assert.equal(w.drainEvents().length,6);w.place(0,450,150);assert.equal(w.tokens.length,6);advance(w,.6);const event=w.drainEvents().find(e=>e.id===0);assert.equal(event.x,450);assert.equal(event.y,150);assert.ok(w.undo());assert.equal(w.tokens.find(o=>o.id===0).x,100);});
+test('six copies per shape, with independent identities and no seventh placement',()=>{
+  const w=create();for(let id=0;id<6;id++)for(let copy=0;copy<6;copy++)assert.ok(w.place(id,100+copy*100,100+id*50));
+  assert.equal(w.tokens.length,36);assert.equal(new Set(w.tokens.map(o=>o.uid)).size,36);
+  const before=JSON.stringify(w.tokens),history=w.history.length;
+  for(let id=0;id<7;id++)assert.equal(w.place(id,20,100),undefined);
+  assert.equal(JSON.stringify(w.tokens),before);assert.equal(w.history.length,history);
+  advance(w,.6);const events=w.drainEvents();assert.equal(events.length,36);assert.equal(new Set(events.map(e=>e.tokenId)).size,36);
+});
+
+test('moving a copy changes only its origin and timer, even at capacity; undo restores it',()=>{
+  const w=create();for(let i=0;i<6;i++)w.place(0,100+i*100,200);
+  advance(w,1);w.drainEvents();const first=w.tokens[0],other=w.tokens[1],before=JSON.stringify(other);
+  w.move(first.uid,450,150);assert.equal(w.tokens.length,6);assert.equal(JSON.stringify(other),before);
+  advance(w,.6);const events=w.drainEvents();assert.equal(events.length,1);assert.equal(events[0].tokenId,first.uid);assert.equal(events[0].x,450);assert.equal(events[0].y,150);
+  assert.ok(w.undo());assert.equal(w.tokens[0].x,100);assert.equal(w.tokens[0].y,200);
+  assert.ok(w.undo());assert.equal(w.tokens.length,5);assert.ok(w.place(0,700,200));assert.equal(w.tokens.length,6);
+});
 
 test('emissions repeat on clocks, even without more placements',()=>{const w=create();w.place(0,200,200);advance(w,.6);assert.equal(w.drainEvents().length,1);advance(w,8);assert.equal(w.drainEvents().length,0);advance(w,1.1);assert.equal(w.drainEvents().length,1);});
 
@@ -26,5 +42,5 @@ for(const [width,height] of [[1440,900],[390,844]])test(`ten minutes of physics 
   if(i%1800===0)w.addLine(i%3600?'spring':'line',30,250,w.width-30,280);
   if(i===8000)w.undo();if(i===10000)w.resize(390,844);if(i===22000)w.reset();
   w.update(1/60);if(i%60===0)w.drainEvents();for(const p of w.people){states.add(p.state);assert.ok(Number.isFinite(p.x)&&Number.isFinite(p.y)&&Number.isFinite(p.vy));assert.ok(p.y<=w.ground+.01);assert.ok(p.x>=0&&p.x<=w.width);}
-  assert.ok(w.tokens.length<=6);assert.ok(w.events.length<=24);
+  assert.ok(w.tokens.length<=36);assert.ok(w.events.length<=72);
 }assert.ok(states.has('climb'));assert.ok(states.has('jump'));assert.ok(states.has('fall'));});

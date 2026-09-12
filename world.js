@@ -19,12 +19,16 @@
   function curve(points,color,width=1){ctx.strokeStyle=color;ctx.lineWidth=width;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(points[0],points[1]);ctx.bezierCurveTo(...points.slice(2));ctx.stroke();}
   function glow(x,y,r,color){const g=ctx.createRadialGradient(x,y,0,x,y,r);g.addColorStop(0,color);g.addColorStop(1,'transparent');ctx.fillStyle=g;ctx.fillRect(x-r,y-r,r*2,r*2);}
   function ring(x,y,rx,ry,color,width=1){ctx.strokeStyle=color;ctx.lineWidth=width;ctx.beginPath();ctx.ellipse(x,y,Math.max(.01,rx),Math.max(.01,ry),0,0,Math.PI*2);ctx.stroke();}
-  function syncTray(){shapeButtons.forEach(b=>{const id=Number(b.dataset.shape),active=selected===id;b.classList.toggle('selected',active);b.classList.toggle('placed',world.tokens.some(o=>o.id===id));b.setAttribute('aria-pressed',String(active));});toolButtons.forEach(b=>{b.classList.toggle('active',b.dataset.tool===tool);b.setAttribute('aria-pressed',String(b.dataset.tool===tool));});canvas.style.cursor=tool==='move'?'grab':'crosshair';}
-  function chooseShape(id){selected=id;tool='move';syncTray();status(world.tokens.some(o=>o.id===id)?'Give this shape another place. Its secret travels with it.':'Place it anywhere. See what unfolds.');}
+  function syncTray(){shapeButtons.forEach(b=>{const id=Number(b.dataset.shape),active=selected===id,count=world.tokens.filter(o=>o.id===id).length;
+    b.classList.toggle('selected',active);b.classList.toggle('full',count===6);b.setAttribute('aria-pressed',String(active));
+    b.setAttribute('aria-label',`${['Circle','Triangle','Diamond','Square','Hexagon','Crescent'][id]}, ${count} of 6 placed`);
+    b.querySelectorAll('.slots i').forEach((dot,i)=>dot.classList.toggle('used',i<count));
+    });toolButtons.forEach(b=>{b.classList.toggle('active',b.dataset.tool===tool);b.setAttribute('aria-pressed',String(b.dataset.tool===tool));});canvas.style.cursor=tool==='move'?'grab':'crosshair';}
+  function chooseShape(id){selected=id;tool='move';syncTray();status(world.tokens.filter(o=>o.id===id).length===6?'All six copies are placed. Drag an existing copy to move it.':'Place another copy anywhere in the world.');}
   function chooseTool(next){tool=next;selected=null;syncTray();status(({move:'Drag a shape to move its next discovery.',line:'Draw a line. A new path through their world.',ladder:'Draw between two heights. A way to climb.',spring:'Draw a line. See how high they fly.'})[next]);}
-  function commitShape(id,x,y){world.place(id,x,y);syncTray();status('Something is stirring. Give it a moment.');}
+  function commitShape(id,x,y){const placed=world.place(id,x,y);syncTray();status(placed?'Something is stirring. Give it a moment.':'All six copies are placed. Drag an existing copy to move it.');}
   function shapePath(id,r){ctx.beginPath();if(id===0)ctx.arc(0,0,r,0,Math.PI*2);else if(id===5){ctx.arc(0,0,r,Math.PI*.32,Math.PI*1.68);ctx.bezierCurveTo(-r*.6,-r*.7,-r*.6,r*.7,Math.cos(Math.PI*.32)*r,Math.sin(Math.PI*.32)*r);}else{const n=({1:3,2:4,3:4,4:6})[id],offset=id===3?Math.PI/4:-Math.PI/2;for(let i=0;i<n;i++){const a=i/n*Math.PI*2+offset,x=Math.cos(a)*r,y=Math.sin(a)*r;i?ctx.lineTo(x,y):ctx.moveTo(x,y);}ctx.closePath();}}
-  function drawToken(o){const held=gesture?.type==='token'&&gesture.id===o.id;const x=held?gesture.x:o.x,y=held?gesture.y:o.y;ctx.save();ctx.translate(x,y);
+  function drawToken(o){const held=gesture?.type==='token'&&gesture.uid===o.uid;const x=held?gesture.x:o.x,y=held?gesture.y:o.y;ctx.save();ctx.translate(x,y);
     const pulse=1+Math.sin(world.time*1.8+o.id)*.05;ctx.scale(pulse,pulse);glow(0,0,42,'#d8c6a51a');
     if(selected===o.id)ring(0,0,28,28,'#e7d7b93d');
     ctx.strokeStyle='#e4d9c6';ctx.lineWidth=1.25;ctx.fillStyle='#181d26d9';shapePath(o.id,17);ctx.fill();ctx.stroke();
@@ -57,7 +61,7 @@
     if(p.expression>0&&p.trait.name!=='shy'){ctx.globalAlpha=Math.min(1,p.expression);ctx.fillStyle='#e1ceaa';ctx.font='9px Georgia';ctx.fillText(p.trait.name==='dancer'?'♪':'·',5,-27);}
     ctx.restore();
   }
-  function emit(event){if(gesture?.type==='token'&&gesture.id===event.id)event={...event,x:gesture.x,y:gesture.y};effects.push({...event,age:0,seed:random(0,1000),life:event.id===2?(event.y+100)/(24*effectScale())+4:[7.5,7,12,10,9,10][event.id]});if(effects.length>24)effects.shift();
+  function emit(event){if(gesture?.type==='token'&&gesture.uid===event.tokenId)event={...event,x:gesture.x,y:gesture.y};effects.push({...event,age:0,seed:random(0,1000),life:event.id===2?(event.y+100)/(24*effectScale())+4:[7.5,7,12,10,9,10][event.id]});if(effects.length>96)effects.shift();
     // The released gust gently lifts adventurous people close to its origin.
     if(event.id===4)for(const p of world.people){if(Math.hypot(p.x-event.x,p.y-event.y)<90&&p.trait.bravery>.5&&!p.ladder){p.support=null;p.vy=-180;p.vx=p.direction*40;p.state='jump';}}
   }
@@ -111,13 +115,13 @@
   canvas.addEventListener('pointerdown',e=>{if(gesture||e.isPrimary===false)return;const p=point(e);if(!inWorld(p))return;canvas.setPointerCapture(e.pointerId);
     if(tool!=='move'){gesture={type:'draw',startX:p.x,startY:p.y,...p,pointerId:e.pointerId};return;}
     const token=[...world.tokens].reverse().find(o=>Math.hypot(o.x-p.x,o.y-p.y)<28);
-    if(token){selected=token.id;syncTray();gesture={type:'token',id:token.id,x:token.x,y:token.y,dx:token.x-p.x,dy:token.y-p.y,pointerId:e.pointerId};}
+    if(token){selected=token.id;syncTray();gesture={type:'token',id:token.id,uid:token.uid,x:token.x,y:token.y,dx:token.x-p.x,dy:token.y-p.y,pointerId:e.pointerId};}
     else if(selected!==null){commitShape(selected,p.x,p.y);}
     else status('Choose one of the six shapes below, or draw a way up.');
   });
   canvas.addEventListener('pointermove',e=>{pointer=point(e);if(gesture&&gesture.pointerId===e.pointerId){gesture.x=clamp(pointer.x+(gesture.dx||0),20,W-20);gesture.y=clamp(pointer.y+(gesture.dy||0),88,world.ground-5);}});
   canvas.addEventListener('pointerup',e=>{if(!gesture||gesture.pointerId!==e.pointerId)return;
-    if(gesture.type==='token')commitShape(gesture.id,gesture.x,gesture.y);
+    if(gesture.type==='token'){world.move(gesture.uid,gesture.x,gesture.y);syncTray();status('The shape has moved.');}
     if(gesture.type==='draw'){const g=gesture;if(world.addLine(tool,g.startX,g.startY,g.x,g.y))status('A new possibility for their little lives.');else status(world.lines.length>=30?'A full world. Undo a line to make room.':'Drag a little farther to draw a line.');}
     gesture=null;
   });
@@ -133,8 +137,8 @@
   toolButtons.forEach(b=>b.addEventListener('click',()=>chooseTool(b.dataset.tool)));
   function undo(){if(world.undo()){effects=[];gesture=null;syncTray();status('One small step back.');}}
   document.querySelector('#undo').addEventListener('click',undo);
-  document.querySelector('#clear').addEventListener('click',()=>{world.reset();effects=[];gesture=null;selected=null;tool='move';syncTray();status('Six shapes. Six secrets. Nothing to win.');});
-  document.querySelector('#pause').addEventListener('click',e=>{paused=!paused;accumulator=0;e.currentTarget.setAttribute('aria-pressed',String(paused));e.currentTarget.innerHTML=paused?'▷ <span>Resume</span>':'Ⅱ <span>Pause</span>';});
+  document.querySelector('#clear').addEventListener('click',()=>{world.reset();effects=[];gesture=null;selected=null;tool='move';syncTray();status('Six copies of each shape are available.');});
+  document.querySelector('#pause').addEventListener('click',e=>{paused=!paused;accumulator=0;e.currentTarget.setAttribute('aria-pressed',String(paused));e.currentTarget.innerHTML=paused?'<span aria-hidden="true">▷</span>':'<span aria-hidden="true">Ⅱ</span>';e.currentTarget.setAttribute('aria-label',paused?'Resume animation':'Pause animation');});
   window.addEventListener('keydown',e=>{if(e.target.matches('input,textarea'))return;if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();undo();return;}if(e.key==='Escape'){gesture=null;selected=null;tool='move';syncTray();return;}if(e.ctrlKey||e.metaKey||e.altKey)return;
     if(/^[1-6]$/.test(e.key))chooseShape(Number(e.key)-1);const shortcut={v:'move',l:'line',h:'ladder',b:'spring'}[e.key.toLowerCase()];if(shortcut)chooseTool(shortcut);
   });

@@ -7,29 +7,26 @@
 </head>
 <body>
 <main>
-  <canvas id="world" aria-label="A side-on world of little people. Place or move the six mystery shapes. Draw paths, ladders, and bouncing lines for people to explore."></canvas>
-  <header><a class="brand" href="./"><span>✳</span> little wonders</a><span class="edition">A WORLD OF SMALL DISCOVERIES</span><button id="pause" aria-pressed="false" title="Pause animation">Ⅱ <span>Pause</span></button></header>
-  <section class="intro"><div class="eyebrow">AN EXPERIMENT IN CURIOSITY</div><h1>Every shape<br>holds a <em>secret.</em></h1><p>Give it a place. Give it a moment.</p></section>
+  <canvas id="world" aria-label="A side-on world of little people. Place up to six copies of each mystery shape, or move existing copies. Draw paths, ladders, and bouncing lines for people to explore."></canvas>
+  <header><button id="pause" aria-pressed="false" aria-label="Pause animation"><span aria-hidden="true">Ⅱ</span></button></header>
   <aside class="drawing" aria-label="Drawing tools">
-    <button data-tool="move" class="active" aria-pressed="true" title="Move shapes (V)"><span>↖</span><span>Move</span></button>
-    <button data-tool="line" aria-pressed="false" title="Draw a path (L)"><span>╱</span><span>Path</span></button>
-    <button data-tool="ladder" aria-pressed="false" title="Draw a ladder (H)"><span>☷</span><span>Ladder</span></button>
-    <button data-tool="spring" aria-pressed="false" title="Draw a bouncing line (B)"><span>⌁</span><span>Bounce</span></button>
-    <div class="rule"></div><button id="undo" title="Undo (Ctrl or Command + Z)" aria-label="Undo last edit"><span>↶</span></button><button id="clear" title="Start over" aria-label="Reset the world"><span>⟳</span></button>
+    <button data-tool="move" class="active" aria-pressed="true" aria-label="Move shapes (V)"><span>↖</span></button>
+    <button data-tool="line" aria-pressed="false" aria-label="Draw a path (L)"><span>╱</span></button>
+    <button data-tool="ladder" aria-pressed="false" aria-label="Draw a ladder (H)"><span>☷</span></button>
+    <button data-tool="spring" aria-pressed="false" aria-label="Draw a bouncing line (B)"><span>⌁</span></button>
+    <div class="rule"></div><button id="undo" aria-label="Undo last edit"><span>↶</span></button><button id="clear" aria-label="Reset the world"><span>⟳</span></button>
   </aside>
   <section class="dock" aria-label="Mystery shapes">
-    <p id="status" role="status">Six shapes. Six secrets. Nothing to win.</p>
+    <p id="status" class="sr-only" role="status">Six copies of each shape are available.</p>
     <div class="shapes">
-      <button class="shape" data-shape="0" aria-label="Circle, shape 1" aria-pressed="false"><svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="13"/></svg><span class="slot-dot"></span></button>
-      <button class="shape" data-shape="1" aria-label="Triangle, shape 2" aria-pressed="false"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M24 9 40 36 8 36Z"/></svg><span class="slot-dot"></span></button>
-      <button class="shape" data-shape="2" aria-label="Diamond, shape 3" aria-pressed="false"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="m24 7 14 17-14 17L10 24Z"/></svg><span class="slot-dot"></span></button>
-      <button class="shape" data-shape="3" aria-label="Square, shape 4" aria-pressed="false"><svg viewBox="0 0 48 48" aria-hidden="true"><rect x="12" y="12" width="24" height="24" rx="2"/></svg><span class="slot-dot"></span></button>
-      <button class="shape" data-shape="4" aria-label="Hexagon, shape 5" aria-pressed="false"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="m16 10 16 0 8 14-8 14H16L8 24Z"/></svg><span class="slot-dot"></span></button>
-      <button class="shape" data-shape="5" aria-label="Crescent, shape 6" aria-pressed="false"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M30 10a15 15 0 1 0 0 28 17 17 0 0 1 0-28Z"/></svg><span class="slot-dot"></span></button>
+      <button class="shape" data-shape="0" aria-label="Circle, shape 1" aria-pressed="false"><svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="13"/></svg><span class="slots" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></span></button>
+      <button class="shape" data-shape="1" aria-label="Triangle, shape 2" aria-pressed="false"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M24 9 40 36 8 36Z"/></svg><span class="slots" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></span></button>
+      <button class="shape" data-shape="2" aria-label="Diamond, shape 3" aria-pressed="false"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="m24 7 14 17-14 17L10 24Z"/></svg><span class="slots" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></span></button>
+      <button class="shape" data-shape="3" aria-label="Square, shape 4" aria-pressed="false"><svg viewBox="0 0 48 48" aria-hidden="true"><rect x="12" y="12" width="24" height="24" rx="2"/></svg><span class="slots" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></span></button>
+      <button class="shape" data-shape="4" aria-label="Hexagon, shape 5" aria-pressed="false"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="m16 10 16 0 8 14-8 14H16L8 24Z"/></svg><span class="slots" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></span></button>
+      <button class="shape" data-shape="5" aria-label="Crescent, shape 6" aria-pressed="false"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M30 10a15 15 0 1 0 0 28 17 17 0 0 1 0-28Z"/></svg><span class="slots" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></span></button>
     </div>
-    <p class="hint">Tap a shape, then the world. Drag it somewhere new.</p>
   </section>
-  <footer><span>48 little lives, following their own inclinations.</span><span>Take your time <i>✧</i></span></footer>
 </main>
 <script src="simulation.js"></script><script src="world.js"></script>
 </body>
