@@ -1,67 +1,30 @@
-const {test} = require('node:test');
-const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const vm = require('node:vm');
-const source = fs.readFileSync(process.env.WORLD_SOURCE || `${__dirname}/../world.js`, 'utf8');
-const kinds = ['flower','tree','water','house','lantern','mushroom','music','windmill','campfire'];
+const {test}=require('node:test');
+const assert=require('node:assert/strict');
+const {World}=require('../simulation.js');
+function create(w=1200,h=800){let seed=31;return new World(w,h,()=>((seed=seed*16807%2147483647)/2147483647));}
+function advance(w,seconds){for(let i=0;i<seconds*60;i++)w.update(1/60);}
+function fallingPerson(w,x,y){const p=w.people[0];Object.assign(p,{x,y,vx:0,vy:0,support:null,ladder:null,state:'fall',rest:0,cooldown:5});return p;}
 
-// Run the real animation and event handlers with a deterministic clock/random
-// source. Canvas is a no-op: these tests check lifecycle, not visual appearance.
-function world(width=1440,height=900) {
-  const noop=()=>{};
-  const ctx=new Proxy({createRadialGradient:()=>({addColorStop:noop})}, {get:(o,k)=>o[k] || noop,set:(o,k,v)=>(o[k]=v,true)});
-  function element(kind) {return {dataset:{kind},classList:{toggle:noop},setAttribute(k,v){this[k]=v;},addEventListener(k,v){this[k]=v;},setPointerCapture:noop};}
-  const buttons=kinds.map(element), elements={};
-  for(const id of ['#status','#pause','#undo','#clear'])elements[id]=element();
-  elements['.controls']={getBoundingClientRect:()=>({top:height-(width<=850?245:205)})};
-  const canvas=Object.assign(element(),{clientWidth:width,clientHeight:height,getContext:()=>ctx,getBoundingClientRect:()=>({left:0,top:0})});elements['#world']=canvas;
-  let next, now=0, seed=31;const listeners={};
-  const math=Object.create(Math);math.random=()=>((seed=seed*16807%2147483647)/2147483647);
-  const sandbox={Math:math,document:{querySelector:s=>elements[s],querySelectorAll:()=>buttons},window:{devicePixelRatio:1,addEventListener:(k,v)=>listeners[k]=v},requestAnimationFrame:f=>next=f};
-  const instrumented=source.replace('  reset();requestAnimationFrame(frame);', '  globalThis.inspect={people,place,get objects(){return objects;},get time(){return time;}}; reset();requestAnimationFrame(frame);');
-  vm.runInNewContext(instrumented,sandbox);
-  return {api:sandbox.inspect,buttons,elements,canvas,listeners,step(n=1){for(let i=0;i<n;i++){const callback=next;next=null;assert.ok(callback,'animation must keep scheduling');callback(now+=1000/60);}}};
-}
+test('people fall under gravity and land on the ground',()=>{const w=create();w.lines=[];const p=fallingPerson(w,200,120);advance(w,.5);assert.ok(p.y>140);assert.ok(p.vy>100);advance(w,3);assert.equal(p.y,w.ground);assert.equal(p.support,'ground');});
 
-test('a person finishing a visit does not crash the next animation frame',()=>{
-  const w=world(),p=w.api.people[0],o=w.api.objects[0];
-  p.target=o;p.x=o.x+Math.sin(p.phase)*35/1440;p.y=o.y+(12+Math.cos(p.phase)*9)/900;
-  p.wait=30;p.state='activity';p.remaining=.001;
-  w.step(3);
-  assert.equal(p.target,null);
-  w.step(120);
-});
+test('falling people land on a sloped path, then fall when it is removed',()=>{const w=create();w.lines=[];w.addLine('line',100,300,400,340);const p=fallingPerson(w,250,200);advance(w,1);assert.equal(p.support,w.lines[0].id);assert.ok(Math.abs(p.y-w.surfaceY(w.lines[0],p.x))<.1);assert.ok(w.undo());advance(w,2);assert.equal(p.support,'ground');});
 
-test('48 people have varied personalities, pace, appearance, and choices',()=>{
-  const w=world();assert.equal(w.api.people.length,48);
-  assert.equal(new Set(w.api.people.map(p=>p.personality.name)).size,6);
-  assert.ok(new Set(w.api.people.map(p=>p.speed)).size>20);
-  assert.ok(new Set(w.api.people.map(p=>p.size)).size>20);
-  w.step(1200);
-  assert.ok(new Set(w.api.people.map(p=>p.state)).size>1);
-  assert.ok(new Set(w.api.people.map(p=>p.target?.kind)).size>3);
-  // Interests must measurably influence decisions over several visits.
-  let favorite=0,other=0;
-  for(let i=0;i<30;i++){w.step(120);for(const p of w.api.people){if(p.target){if(p.personality.favorites.includes(p.target.kind))favorite++;else other++;}}}
-  assert.ok(favorite>other,`favorite choices ${favorite}, others ${other}`);
-});
+test('spring lines launch people upward rather than hold them',()=>{const w=create();w.lines=[];w.addLine('spring',100,350,500,350);const p=fallingPerson(w,250,330);advance(w,.5);assert.equal(p.support,null);assert.ok(p.vy<0);assert.ok(p.y<330);assert.ok(w.lines[0].pulse>0);});
 
-for(const [width,height] of [[1440,900],[390,844]]) {
-  test(`ten simulated minutes with all objects, undo, reset, pause, resize at ${width}px`,()=>{
-    const w=world(width,height);
-    for(const b of w.buttons){b.click();w.canvas.pointerdown({clientX:width*.5,clientY:height*.5});assert.equal(w.api.objects.at(-1).kind,b.dataset.kind);b.keydown({key:'Enter',preventDefault(){}});assert.equal(w.api.objects.at(-1).kind,b.dataset.kind);b.pointerdown({clientX:20,clientY:height-100,pointerId:1});b.pointerup({clientX:width*.4,clientY:height*.48});assert.equal(w.api.objects.at(-1).kind,b.dataset.kind);}
-    w.step(600);
-    const pause=w.elements['#pause'];pause.click({currentTarget:pause});const before=w.api.time,positions=JSON.stringify(w.api.people.map(p=>[p.x,p.y,p.state,p.remaining]));w.step(120);assert.equal(w.api.time,before);assert.equal(JSON.stringify(w.api.people.map(p=>[p.x,p.y,p.state,p.remaining])),positions);pause.click({currentTarget:pause});w.step();assert.ok(w.api.time>before);
-    for(let i=0;i<600;i++) {
-      if(i%17===0)w.api.place(.2+(i%6)*.1,.5,kinds[i%9]);
-      if(i%31===0)w.elements['#undo'].click();
-      if(i===100) {while(w.api.objects.length)w.elements['#undo'].click();}
-      if(i===150)w.elements['#clear'].click();
-      if(i===200){w.canvas.clientWidth=390;w.canvas.clientHeight=844;w.listeners.resize();}
-      w.step(60);
-      assert.ok(w.api.objects.length<=35);
-      for(const p of w.api.people){assert.ok(Number.isFinite(p.x)&&Number.isFinite(p.y));assert.ok(p.x>=0&&p.x<=1&&p.y>=0&&p.y<=1);}
-    }
-    assert.ok(w.api.time>600);
-  });
-}
+test('ladders take people from ground to a higher platform',()=>{const w=create();w.random=()=>0;w.lines=[];w.addLine('line',100,300,400,300);w.addLine('ladder',200,w.ground,200,300);const p=w.people[0];Object.assign(p,{x:200,y:w.ground,support:'ground',ladder:null,rest:0,cooldown:0,decision:100});w.update(1/60);assert.equal(p.state,'climb');advance(w,2);assert.ok(p.y<w.ground-20);let arrived=false;for(let i=0;i<30*60;i++){w.update(1/60);if(p.support===w.lines[0].id){arrived=true;break;}}assert.ok(arrived,'climber should land on the higher platform');});
+
+test('removing a ladder during a climb releases the climber safely',()=>{const w=create();w.lines=[];w.addLine('ladder',200,w.ground,200,200);const p=w.people[0];Object.assign(p,{x:200,y:350,ladder:w.lines[0].id,climbUp:true,support:null,state:'climb'});w.undo();assert.equal(p.ladder,null);advance(w,3);assert.equal(p.support,'ground');});
+
+test('only six mystery objects exist, moving one resets its timer and origin',()=>{const w=create();assert.equal(w.tokens.length,0);for(let id=0;id<6;id++)w.place(id,100+id*100,200);w.place(6,20,100);assert.equal(w.tokens.length,6);advance(w,.4);assert.equal(w.drainEvents().length,0);advance(w,.2);assert.equal(w.drainEvents().length,6);w.place(0,450,150);assert.equal(w.tokens.length,6);advance(w,.6);const event=w.drainEvents().find(e=>e.id===0);assert.equal(event.x,450);assert.equal(event.y,150);assert.ok(w.undo());assert.equal(w.tokens.find(o=>o.id===0).x,100);});
+
+test('emissions repeat on clocks, even without more placements',()=>{const w=create();w.place(0,200,200);advance(w,.6);assert.equal(w.drainEvents().length,1);advance(w,8);assert.equal(w.drainEvents().length,0);advance(w,1.1);assert.equal(w.drainEvents().length,1);});
+
+test('cautious people turn at edges; adventurous people step off',()=>{const w=create();w.lines=[];w.addLine('line',100,300,400,300);const l=w.lines[0];const brave=w.people[2],shy=w.people[3];for(const p of [brave,shy])Object.assign(p,{x:399,y:300,direction:1,support:l.id,ladder:null,rest:0,decision:100,cooldown:100});advance(w,.2);assert.equal(brave.support,null);assert.ok(brave.y>300);assert.equal(shy.support,l.id);assert.equal(shy.direction,-1);});
+
+for(const [width,height] of [[1440,900],[390,844]])test(`ten minutes of physics and discovery clocks at ${width}px`,()=>{const w=create(width,height);const states=new Set();assert.equal(w.people.length,48);assert.equal(new Set(w.people.map(p=>p.trait.name)).size,6);for(let i=0;i<36000;i++){
+  if(i%900===0)w.place((i/900)%6,40+(i%7)*(w.width-80)/7,100+(i%5)*(w.ground-140)/5);
+  if(i%1800===0)w.addLine(i%3600?'spring':'line',30,250,w.width-30,280);
+  if(i===8000)w.undo();if(i===10000)w.resize(390,844);if(i===22000)w.reset();
+  w.update(1/60);if(i%60===0)w.drainEvents();for(const p of w.people){states.add(p.state);assert.ok(Number.isFinite(p.x)&&Number.isFinite(p.y)&&Number.isFinite(p.vy));assert.ok(p.y<=w.ground+.01);assert.ok(p.x>=0&&p.x<=w.width);}
+  assert.ok(w.tokens.length<=6);assert.ok(w.events.length<=24);
+}assert.ok(states.has('climb'));assert.ok(states.has('jump'));assert.ok(states.has('fall'));});

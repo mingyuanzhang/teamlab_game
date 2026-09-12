@@ -2,27 +2,35 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Little Wonders · A world that grows with you</title>
+<title>Little Wonders · Shapes with secrets</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <main>
-<header><a class="brand" href="./"><span class="brand-mark">✳</span> little wonders<span class="edition">AN INTERACTIVE PLAYGROUND</span></a><button id="pause" class="quiet" aria-pressed="false">Ⅱ <span>Pause</span></button></header>
-<section class="intro"><div class="eyebrow"><span></span> SMALL THINGS. WONDERFUL POSSIBILITIES.</div><h1>A little world.<br>A little <em>wonder.</em></h1><p>Place something small. Watch a story grow.</p></section>
-<div class="scene"><canvas id="world" aria-label="Interactive little world. Select an object below, then click or tap to place it. You can also press Enter on an object button to place it in the world."></canvas></div>
-<div class="scene-note"><span class="live-dot"></span><span id="status" role="status">Your little people are exploring</span></div>
-<section class="controls" aria-label="Objects to place"><div class="tray-label">GIVE THEIR WORLD A LITTLE SOMETHING</div><div class="tray">
-<button class="object selected" data-kind="flower" aria-pressed="true"><span class="icon flower">✿</span><span>Flower</span><kbd>1</kbd></button>
-<button class="object" data-kind="tree" aria-pressed="false"><span class="icon tree">♧</span><span>Tree</span><kbd>2</kbd></button>
-<button class="object" data-kind="water" aria-pressed="false"><span class="icon water">◕</span><span>Raindrop</span><kbd>3</kbd></button>
-<button class="object" data-kind="house" aria-pressed="false"><span class="icon house">⌂</span><span>Home</span><kbd>4</kbd></button>
-<button class="object" data-kind="lantern" aria-pressed="false"><span class="icon lantern">✧</span><span>Lantern</span><kbd>5</kbd></button>
-<button class="object" data-kind="mushroom" aria-pressed="false"><span class="icon mushroom">♠</span><span>Mushrooms</span><kbd>6</kbd></button>
-<button class="object" data-kind="music" aria-pressed="false"><span class="icon music">♫</span><span>Music box</span><kbd>7</kbd></button>
-<button class="object" data-kind="windmill" aria-pressed="false"><span class="icon windmill">✣</span><span>Pinwheels</span><kbd>8</kbd></button>
-<button class="object" data-kind="campfire" aria-pressed="false"><span class="icon campfire">♨</span><span>Campfire</span><kbd>9</kbd></button>
-<div class="tools"><button id="undo" class="tool" aria-label="Undo last placement" title="Undo last placement">↶</button><button id="clear" class="tool" aria-label="Start a new world" title="Start a new world">⟳</button></div>
-</div><p class="hint">Choose an object, then tap anywhere in the meadow <span>·</span> or drag it into the world</p></section>
-<footer><span>A small escape, made for your curiosity.</span><span id="count">48 little personalities <span class="footer-star">✦</span> endless possibilities</span></footer>
-</main><script src="world.js"></script>
-</body></html>
+  <canvas id="world" aria-label="A side-on world of little people. Place or move the six mystery shapes. Draw paths, ladders, and bouncing lines for people to explore."></canvas>
+  <header><a class="brand" href="./"><span>✳</span> little wonders</a><span class="edition">A WORLD OF SMALL DISCOVERIES</span><button id="pause" aria-pressed="false" title="Pause animation">Ⅱ <span>Pause</span></button></header>
+  <section class="intro"><div class="eyebrow">AN EXPERIMENT IN CURIOSITY</div><h1>Every shape<br>holds a <em>secret.</em></h1><p>Give it a place. Give it a moment.</p></section>
+  <aside class="drawing" aria-label="Drawing tools">
+    <button data-tool="move" class="active" aria-pressed="true" title="Move shapes (V)"><span>↖</span><span>Move</span></button>
+    <button data-tool="line" aria-pressed="false" title="Draw a path (L)"><span>╱</span><span>Path</span></button>
+    <button data-tool="ladder" aria-pressed="false" title="Draw a ladder (H)"><span>☷</span><span>Ladder</span></button>
+    <button data-tool="spring" aria-pressed="false" title="Draw a bouncing line (B)"><span>⌁</span><span>Bounce</span></button>
+    <div class="rule"></div><button id="undo" title="Undo (Ctrl or Command + Z)" aria-label="Undo last edit"><span>↶</span></button><button id="clear" title="Start over" aria-label="Reset the world"><span>⟳</span></button>
+  </aside>
+  <section class="dock" aria-label="Mystery shapes">
+    <p id="status" role="status">Six shapes. Six secrets. Nothing to win.</p>
+    <div class="shapes">
+      <button class="shape" data-shape="0" aria-label="Circle, shape 1" aria-pressed="false"><svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="13"/></svg><span class="slot-dot"></span></button>
+      <button class="shape" data-shape="1" aria-label="Triangle, shape 2" aria-pressed="false"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M24 9 40 36 8 36Z"/></svg><span class="slot-dot"></span></button>
+      <button class="shape" data-shape="2" aria-label="Diamond, shape 3" aria-pressed="false"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="m24 7 14 17-14 17L10 24Z"/></svg><span class="slot-dot"></span></button>
+      <button class="shape" data-shape="3" aria-label="Square, shape 4" aria-pressed="false"><svg viewBox="0 0 48 48" aria-hidden="true"><rect x="12" y="12" width="24" height="24" rx="2"/></svg><span class="slot-dot"></span></button>
+      <button class="shape" data-shape="4" aria-label="Hexagon, shape 5" aria-pressed="false"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="m16 10 16 0 8 14-8 14H16L8 24Z"/></svg><span class="slot-dot"></span></button>
+      <button class="shape" data-shape="5" aria-label="Crescent, shape 6" aria-pressed="false"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M30 10a15 15 0 1 0 0 28 17 17 0 0 1 0-28Z"/></svg><span class="slot-dot"></span></button>
+    </div>
+    <p class="hint">Tap a shape, then the world. Drag it somewhere new.</p>
+  </section>
+  <footer><span>48 little lives, following their own inclinations.</span><span>Take your time <i>✧</i></span></footer>
+</main>
+<script src="simulation.js"></script><script src="world.js"></script>
+</body>
+</html>
