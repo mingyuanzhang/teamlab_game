@@ -3,12 +3,16 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Little Wonders · Shapes with secrets</title>
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=cf66ede913ef">
 </head>
 <body>
 <main>
   <canvas id="world" aria-label="A side-on world of little people. Place up to six copies of each mystery shape, or move existing copies. Draw paths, ladders, and bouncing lines for people to explore."></canvas>
-  <header><button id="pause" aria-pressed="false" aria-label="Pause animation"><span aria-hidden="true">Ⅱ</span></button></header>
+  <header>
+    <label class="music-theme" for="music-theme"><span aria-hidden="true">♫</span><span class="sr-only">Music theme</span><select id="music-theme" aria-label="Music theme" title="Music theme"><option value="default">Default</option><option value="jazz">Jazz</option><option value="rock">Rock</option><option value="classical">Classical</option><option value="bach">Bach</option><option value="chopin">Chopin</option></select></label>
+    <button id="sound" aria-pressed="false" aria-label="Mute sound" title="Mute music and discovery tunes · M"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4Z"/><path class="sound-waves" d="M15 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"/><path class="sound-slash" d="m15 9 6 6m0-6-6 6"/></svg></button>
+    <button id="pause" aria-pressed="false" aria-label="Pause animation" title="Pause · Space"><span aria-hidden="true">Ⅱ</span></button>
+  </header>
   <aside class="drawing" aria-label="Drawing tools">
     <button data-tool="move" class="active" aria-pressed="true" aria-label="Move shapes (V)"><span>↖</span></button>
     <button data-tool="line" aria-pressed="false" aria-label="Draw a path (L)"><span>╱</span></button>
@@ -28,6 +32,6 @@
     </div>
   </section>
 </main>
-<script src="simulation.js"></script><script src="world.js"></script>
+<script src="simulation.js?v=b52d7b3210e6"></script><script src="vendor/wonder-audio/audio.js?v=984aa72108c5"></script><script src="world.js?v=f49700cb32ba"></script>
 </body>
 </html>
