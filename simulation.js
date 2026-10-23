@@ -5,6 +5,7 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, () => {
   'use strict';
   const clamp = (n,a,b) => Math.max(a,Math.min(b,n));
+  const TOKEN_RADIUS = 7;
   const traits = [
     {name:'wanderer',speed:29,climb:.75,bravery:.8,pause:.08},
     {name:'dreamer',speed:15,climb:.35,bravery:.25,pause:.35},
@@ -53,7 +54,7 @@
         const s=p.size*(this.width<700?.75:.92);
         const nearestX=clamp(x,p.x-7*s,p.x+7*s);
         const nearestY=clamp(y,p.y-27*s,p.y+2*s);
-        return Math.hypot(x-nearestX,y-nearestY)<19;
+        return Math.hypot(x-nearestX,y-nearestY)<TOKEN_RADIUS+2;
       });
     }
     positionToken(o,x,y) {
@@ -141,5 +142,5 @@
       if(p.support && support?.kind==='spring'){p.support=null;p.vy=-220;p.state='jump';support.pulse=.65;}
     }
   }
-  return {World,traits};
+  return {World,traits,TOKEN_RADIUS};
 });

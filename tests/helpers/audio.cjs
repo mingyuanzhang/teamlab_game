@@ -8,12 +8,13 @@ class AudioNode {
   disconnect(){this.connections=[];}
 }
 class AudioContext {
-  constructor(){this.state='suspended';this.currentTime=0;this.destination=new AudioNode();this.sources=[];}
+  constructor(){this.state='suspended';this.currentTime=0;this.sampleRate=48000;this.destination=new AudioNode();this.sources=[];}
   createBuffer(channels,length,sampleRate){
     const data=Array.from({length:channels},()=>new Float32Array(length));
     return {length,sampleRate,duration:length/sampleRate,numberOfChannels:channels,getChannelData:i=>data[i]};
   }
   createGain(){return Object.assign(new AudioNode(),{gain:new AudioParam()});}
+  createConvolver(){return Object.assign(new AudioNode(),{buffer:null,normalize:true});}
   createDynamicsCompressor(){
     return Object.assign(new AudioNode(),Object.fromEntries(['threshold','knee','ratio','attack','release'].map(key=>[key,new AudioParam()])));
   }

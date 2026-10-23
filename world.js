@@ -5,9 +5,8 @@
   let W=canvas.clientWidth,H=canvas.clientHeight,dpr=1;
   const world=new LittleWorld.World(W,H);
   let paused=false,last=0,accumulator=0,selected=null,tool='move',gesture=null,pointer=null,effects=[];
-  const palettes=[['#9de5ed','#638fc7','#c4b6df'],['#efae83','#edcf8f','#dc8fa4'],['#e5aeb9','#d1badc','#f3cfad'],['#b4c9a7','#e7b5c3','#c7accd'],['#adbbec','#dac6e4','#b0d9cb'],['#aad2ca','#e6cfa2','#bdc9ec']];
+  const art=LittleArt.createPainter(ctx),tokenRadius=LittleWorld.TOKEN_RADIUS;
   const coats=['#e4cab0','#bec9bf','#d5b3ba','#b7c5df','#d1c39b','#aaa8bd'];
-  const random=(a,b)=>a+Math.random()*(b-a);
   const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
   const noise=n=>{const v=Math.sin(n*127.1+311.7)*43758.5453;return v-Math.floor(v);};
   const status=text=>document.querySelector('#status').textContent=text;
@@ -54,11 +53,11 @@
   function commitShape(id,x,y){const placed=world.place(id,x,y);syncTray();status(placed?'Something is stirring. Give it a moment.':world.placementBlocked(x,y)?'A little person is here. Try another spot.':'All six copies are placed. Select Move to move an existing copy.');}
   function shapePath(id,r){ctx.beginPath();if(id===0)ctx.arc(0,0,r,0,Math.PI*2);else if(id===5){ctx.arc(0,0,r,Math.PI*.32,Math.PI*1.68);ctx.bezierCurveTo(-r*.6,-r*.7,-r*.6,r*.7,Math.cos(Math.PI*.32)*r,Math.sin(Math.PI*.32)*r);}else{const n=({1:3,2:4,3:4,4:6})[id],offset=id===3?Math.PI/4:-Math.PI/2;for(let i=0;i<n;i++){const a=i/n*Math.PI*2+offset,x=Math.cos(a)*r,y=Math.sin(a)*r;i?ctx.lineTo(x,y):ctx.moveTo(x,y);}ctx.closePath();}}
   function drawToken(o){const held=gesture?.type==='token'&&gesture.uid===o.uid;const x=held?gesture.x:o.x,y=held?gesture.y:o.y;ctx.save();ctx.translate(x,y);
-    const pulse=1+Math.sin(world.time*1.8+o.id)*.05;ctx.scale(pulse,pulse);glow(0,0,42,'#d8c6a51a');
-    if(selected===o.id)ring(0,0,28,28,'#e7d7b93d');
-    ctx.strokeStyle=held&&world.placementBlocked(x,y)?'#ed9c97':'#e4d9c6';ctx.lineWidth=1.25;ctx.fillStyle='#181d26d9';shapePath(o.id,17);ctx.fill();ctx.stroke();
-    ctx.strokeStyle='#d6b98e65';ctx.lineWidth=1;ctx.beginPath();ctx.arc(0,0,23,-Math.PI/2,-Math.PI/2+Math.PI*2*(1-o.timer/o.period));ctx.stroke();
-    ellipse(0,0,1.3,1.3,'#f5dfbc');ctx.restore();
+    const pulse=1+Math.sin(world.time*1.8+o.id)*.05;ctx.scale(pulse,pulse);glow(0,0,18,'#d8c6a50c');
+    if(selected===o.id)ring(0,0,14,14,'#e7d7b956');
+    ctx.strokeStyle=held&&world.placementBlocked(x,y)?'#ed9c97':'#e4d9c6';ctx.lineWidth=.85;ctx.fillStyle='#181d26b0';shapePath(o.id,tokenRadius);ctx.fill();ctx.stroke();
+    ctx.strokeStyle='#d6b98e45';ctx.lineWidth=.65;ctx.beginPath();ctx.arc(0,0,11,-Math.PI/2,-Math.PI/2+Math.PI*2*(1-o.timer/o.period));ctx.stroke();
+    ellipse(0,0,.8,.8,'#f5dfbc');ctx.restore();
   }
   function drawLine(l,preview=false){const spring=l.kind==='spring',ladder=l.kind==='ladder';const color=preview?'#e8d1a5aa':spring?'#dbaeb383':ladder?'#b3c5cb66':'#c5c9cc77';
     if(ladder){const dx=l.x2-l.x1,dy=l.y2-l.y1,length=Math.hypot(dx,dy),nx=-dy/(length||1)*4,ny=dx/(length||1)*4;
@@ -88,48 +87,18 @@
   }
   function emit(event){if(gesture?.type==='token'&&gesture.uid===event.tokenId)event={...event,x:gesture.x,y:gesture.y};
     const cue=sound.playDiscovery(event);
-    effects.push({...event,age:cue?Math.min(0,sound.context.currentTime-cue.when):0,startsAt:cue?.when,musicBeat:cue?.beat,seed:random(0,1000),life:event.id===2?(event.y+100)/(24*effectScale())+4:[7.5,7,12,10,9,10][event.id]});if(effects.length>96)effects.shift();
+    effects.push({...event,age:cue?Math.min(0,sound.context.currentTime-cue.when):0,startsAt:cue?.when,musicBeat:cue?.beat,seed:event.tokenId*17.31+event.cycle*113.7,life:event.id===2?(event.y+100)/(24*effectScale())+4:[7.5,7,12,10,9,10][event.id]});if(effects.length>96)effects.shift();
   }
   function startEffect(event){
     // The released gust gently lifts adventurous people close to its origin.
     if(event.id===4)for(const p of world.people){if(Math.hypot(p.x-event.x,p.y-event.y)<90&&p.trait.bravery>.5&&!p.ladder){p.support=null;p.vy=-180;p.vx=p.direction*40;p.state='jump';}}
   }
-  function drawRain(e){const baseAlpha=ctx.globalAlpha,t=e.age,c=palettes[0],grow=clamp(t*1.4,0,1);glow(0,10,125,'#91bacb0b');
-    // Layered translucent contours build a cloud of ink above its source.
-    for(let j=0;j<7;j++){const x=(j-3)*18,yy=-14-Math.sin(j*1.8)*9;ellipse(x,yy,(24+j%3*4)*grow,10*grow,c[j%3]+'0c');curve([x-24,yy,x-8,yy-24,x+19,yy-15,x+29,yy+2],c[j%3]+'59',.65);}
-    for(let i=0;i<85;i++){const start=noise(i+e.seed)*2.4,age=t-start;if(age<0||age>4.7)continue;const x=(noise(i*3+e.seed)-.5)*150+Math.sin(t+i)*3,y=age*(74+noise(i)*45);const ground=(world.ground-e.y)/effectScale();const yy=Math.min(y,ground);
-      ctx.globalAlpha=baseAlpha*clamp((4.7-age)*.8,0,.65);if(y<ground){stroke([[x,yy-9-noise(i)*12],[x-2,yy]],c[i%3],.65);ellipse(x-2,yy,1,1.5,c[i%3]);}else{ring(x,ground,4+(age%1)*15,1+(age%1)*3,c[i%3]+'88',.6);}}
-    ctx.globalAlpha=baseAlpha;
-  }
-  function drawFireworks(e){const baseAlpha=ctx.globalAlpha,t=e.age,c=palettes[1];for(let j=0;j<4;j++){const age=t-j*.75;if(age<0)continue;const cx=Math.sin(j*5+e.seed)*65,cy=-65-j%2*53;
-      if(age<.65){const f=age/.65;curve([0,0,cx*.3,-25,cx*.7,cy*.6,cx*f,cy*f],'#efce9677',.9);glow(cx*f,cy*f,12,'#efd3a755');continue;}
-      const a=age-.65;if(a>4)continue;const expansion=1-Math.exp(-a*1.8);ctx.globalAlpha=baseAlpha*Math.max(0,1-a/4);
-      for(let i=0;i<55;i++){const angle=i/55*Math.PI*2,r=(42+noise(i+j*8)*37)*expansion,fall=a*a*8;const x=cx+Math.cos(angle)*r,y=cy+Math.sin(angle)*r+fall;const tail=.8+Math.min(a,.8)*.14;stroke([[cx+(x-cx)*tail,cy+(y-cy)*tail],[x,y]],c[i%3]+'9c',.7);ellipse(x,y,i%5===0?1.5:.8,i%5===0?1.5:.8,c[i%3]);}
-      ring(cx,cy+a*a*8,75*expansion,75*expansion,'#e9bca91a',.5);glow(cx,cy,70,'#e3aa8b0b');}
-    ctx.globalAlpha=baseAlpha;
-  }
-  function drawBalloons(e){const c=palettes[2];for(let i=0;i<5;i++){const age=e.age-i*.55;if(age<0)continue;const x=Math.sin(age*.5+i*2)*25+(i-2)*13,y=-age*(24+i*3),r=12+i%3*4,inflate=clamp(age*2,0,1);ctx.save();ctx.translate(x,y);ctx.rotate(Math.sin(age+i)*.08);
-      ellipse(0,-r,r*inflate,r*1.25*inflate,c[i%3]+'13');ring(0,-r,r*inflate,r*1.25*inflate,c[i%3]+'b0',.8);curve([-r*.3,-r*2,-r,-r*1.5,-r*.6,-r*.5,0,0],c[i%3]+'45',.6);curve([r*.3,-r*2,r,-r*1.5,r*.6,-r*.5,0,0],c[i%3]+'45',.6);
-      curve([0,r*.25,Math.sin(age)*15,23,-Math.sin(age)*13,39,Math.sin(age*.6)*8,55],c[i%3]+'75',.6);ellipse(0,r*.25,1.5,1,c[i%3]);ctx.restore();}}
-  function drawGarden(e){const t=e.age,c=palettes[3],grow=clamp(t/3,0,1);for(let k=0;k<9;k++){const a=(k/8-.5)*2.5,reach=(70+noise(k+e.seed)*75)*grow,x=Math.sin(a)*reach,y=-Math.cos(a)*reach;
-      curve([0,0,x*.15,-reach*.45,x*.85,-reach*.3,x,y],c[k%3]+'75',.8);
-      for(let j=1;j<6;j++){const q=j/6,xx=x*q,yy=y*q;ctx.save();ctx.translate(xx,yy);ctx.rotate(a+(j%2?1:-1)*.8);ellipse(0,-3,2.5*grow,9*grow,c[(k+1)%3]+'24');curve([0,5,-7,-2,-4,-12,0,-14],c[k%3]+'66',.5);ctx.restore();}
-      const bloom=clamp((t-1.2-k*.1)*1.4,0,1);ctx.save();ctx.translate(x,y);ctx.rotate(Math.sin(t*.6+k)*.15);for(let j=0;j<7;j++){ctx.rotate(Math.PI*2/7);ellipse(0,-7*bloom,3*bloom,9*bloom,c[(k+1)%3]+'2b');ring(0,-7*bloom,3*bloom,9*bloom,c[(k+1)%3]+'77',.5);}ellipse(0,0,2,2,'#eedbb2');ctx.restore();}}
-  function drawRibbons(e){const c=palettes[4],t=e.age;for(let j=0;j<13;j++){const points=[];for(let i=0;i<65;i++){const u=i/64,spread=clamp(t*.65,0,1);const x=(u*220+Math.sin(u*7-t)*19)*spread,y=(-u*90+Math.sin(u*9-t*1.3+j*.12)*26)*spread+(j-6)*u*3;points.push([x,y]);}stroke(points,c[j%3]+(j%4?'35':'88'),j%4?.55:1);}
-    for(let i=0;i<16;i++){const f=(t*.18+i*.063)%1,x=f*220,y=-f*90+Math.sin(f*9-t*1.3)*26;ctx.save();ctx.translate(x,y);ctx.rotate(t+i);ellipse(0,0,4,1.5,c[i%3]+'a0');ctx.restore();}}
-  function drawOrbits(e){const t=e.age,c=palettes[5];for(let i=0;i<12;i++){const age=t-i*.18;if(age<0)continue;const r=age*15,cy=-age*15;ctx.save();ctx.translate(Math.sin(age*.6)*age*12,cy);ctx.rotate(age*.2+i*.12);ring(0,0,r,r*.42,c[i%3]+'48',.7);const a=age*.8+i*2;ellipse(Math.cos(a)*r,Math.sin(a)*r*.42,2,2,c[i%3]);ctx.restore();}glow(0,-t*12,80,'#b0dace0a');}
   function effectScale(){return Math.min(1,W/700+.3);}
   function drawEffect(e){if(e.age<0)return;
     const transport=sound.currentBeat();
     const beat=e.musicBeat!==undefined&&transport!==null?Math.max(0,transport-e.musicBeat):WonderAudio.straightBeat(e.age/sound.beatLength,sound.theme);
     e.motionTime=beat*WonderAudio.BEAT;
-    const pulse=.5+.5*Math.cos(beat*Math.PI*2);
-    ctx.save();ctx.translate(e.x,e.y);ctx.scale(effectScale(),effectScale());const alpha=clamp(e.age*2,0,1)*clamp((e.life-e.age)/1.5,0,1);
-    // Fade each drawing while preserving translucent individual strokes.
-    ctx.globalAlpha=alpha;
-    ring(0,0,24+pulse*4,7+pulse,'#d7cbb526',.6);
-    [drawRain,drawFireworks,drawBalloons,drawGarden,drawRibbons,drawOrbits][e.id](e);
-    ctx.restore();
+    art.draw(e,{scale:effectScale(),ground:(world.ground-e.y)/effectScale(),beat,motion:e.motionTime});
   }
   function render(){ctx.clearRect(0,0,W,H);const t=world.time;
     for(let i=0;i<70;i++){const x=noise(i)*W,y=70+noise(i+80)*(world.ground-70);ctx.globalAlpha=.15+Math.sin(t*.3+i)*.08;ellipse(x,y,.5,.5,'#e1dccf');}ctx.globalAlpha=1;
@@ -138,8 +107,8 @@
     for(let i=0;i<80;i++){const x=noise(i+19)*W;stroke([[x,world.ground+3],[x+noise(i)*6,world.ground+5]],'#bbb3a322',.6);}
     world.lines.forEach(l=>drawLine(l));effects.forEach(drawEffect);world.people.forEach(drawPerson);world.tokens.forEach(drawToken);
     if(gesture?.type==='draw')drawLine({kind:tool,x1:gesture.startX,y1:gesture.startY,x2:gesture.x,y2:gesture.y},true);
-    if(gesture?.type==='new'){ctx.save();ctx.translate(gesture.x,gesture.y);ctx.strokeStyle=world.placementBlocked(gesture.x,gesture.y)?'#ed9c97':'#eddbc0';ctx.lineWidth=1;shapePath(gesture.id,17);ctx.stroke();ctx.restore();}
-    else if(pointer&&tool==='place'&&selected!==null&&!gesture&&pointer.y>85&&pointer.y<world.ground){ctx.globalAlpha=.25;ctx.save();ctx.translate(pointer.x,pointer.y);ctx.strokeStyle=world.placementBlocked(pointer.x,pointer.y)?'#ed9c97':'#eddbc0';shapePath(selected,17);ctx.stroke();ctx.restore();ctx.globalAlpha=1;}
+    if(gesture?.type==='new'){ctx.save();ctx.translate(gesture.x,gesture.y);ctx.strokeStyle=world.placementBlocked(gesture.x,gesture.y)?'#ed9c97':'#eddbc0';ctx.lineWidth=1;shapePath(gesture.id,tokenRadius);ctx.stroke();ctx.restore();}
+    else if(pointer&&tool==='place'&&selected!==null&&!gesture&&pointer.y>85&&pointer.y<world.ground){ctx.globalAlpha=.25;ctx.save();ctx.translate(pointer.x,pointer.y);ctx.strokeStyle=world.placementBlocked(pointer.x,pointer.y)?'#ed9c97':'#eddbc0';shapePath(selected,tokenRadius);ctx.stroke();ctx.restore();ctx.globalAlpha=1;}
   }
   function frame(now){const elapsed=last?Math.min((now-last)/1000,.1):0;last=now;
     if(!paused){accumulator+=elapsed;while(accumulator>=1/60){world.update(1/60);world.drainEvents().forEach(emit);for(const e of effects){

@@ -60,6 +60,7 @@ for(const width of [1200,390])test(`only people block placement and moves at ${w
   assert.equal(w.place(1,180,230),undefined);assert.equal(w.tokens.length,1);
   assert.equal(w.move(token.uid,180,230),undefined);assert.equal(token.x,100);assert.equal(token.y,130);assert.equal(w.history.length,history);
   // Check the full shape footprint, not just whether its center hits a person.
-  assert.ok(w.placementBlocked(200,230));assert.ok(!w.placementBlocked(215,230));
+  assert.ok(w.placementBlocked(192,230));assert.ok(!w.placementBlocked(205,230));
+  assert.ok(w.place(1,205,230),'A small shape fits beside the person without covering their body');
   person.x=width-30;assert.ok(w.place(1,180,230));assert.ok(w.move(token.uid,180,230));
 });

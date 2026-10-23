@@ -4,6 +4,8 @@ An original, side-on browser playground about small lives and unexpected discove
 
 Six unnamed geometric shapes have six copies each, for up to 36 objects. Place one to discover its timed illustration. Move it to relocate the next reveal. Each shape repeats its animation automatically; selecting a tray shape places another copy until all six are in use. Each copy has its own clock and can be moved independently. Shapes can overlap each other and any running illustrations; placement or movement is blocked only where the shape would cover a little person.
 
+The placed shapes are small, 14-pixel markers so the people and artwork carry the scene. Discoveries combine translucent ink clouds and rain, chrysanthemum fireworks, paper lantern balloons, layered flower petals, flowing silk, and miniature constellations. Each entrance springs past full size with squash, stretch, and a little rotation, then settles. Blooms and bursts have their own staggered pops. Each copy and repeat changes the composition; endings dissolve into drifting pigment without shrinking the artwork. Generous invisible drag targets keep the tiny shapes easy to move.
+
 Open `index.html` in a modern browser, or serve this folder:
 
 ```sh
@@ -20,6 +22,7 @@ Visit http://localhost:8000. No build or install is required. The page works off
 - Undo reverses a placement, move, or drawn line. Reset returns all copies to their tray and restores the starting paths.
 - Pause freezes the people, discovery clocks, and illustrations.
 - Music begins after your first click, tap, or game key. Every discovery has its own melody and enters with its illustration on the soundtrack's beat. The Music menu selects Default, Jazz, Rock, Classical, Bach, or Chopin; all six shapes follow that theme's harmony and groove. The speaker button or **M** mutes everything. Theme and mute preferences are remembered. Audio pauses with the world and while the tab is hidden; browsers without Web Audio still play silently.
+- Original themes have contrasting A/B sections; all discoveries vary their answers across repeats. Busy scenes share up to three foreground phrases, giving other reveals gentle accents and rotating full phrases between copies. Every visual still enters on time. Softer dynamics, expressive instrument tone, and a small shared room keep the sound gentle.
 - Keys 1–6 select shapes. Enter on a focused shape places it. V selects Move, L selects Path, H selects Ladder, B selects Bounce, Space pauses, M toggles sound, and Escape cancels a drag or selection. Ctrl/Cmd+Z undoes an edit. Selecting a tray shape stays in placement mode, including when tapping on top of another shape.
 
 This is a small 2D simulation, not a full pathfinding system: people choose their own direction and decide whether to climb ladders they encounter. Released illustrations continue from their release position; moving a shape relocates future releases.
@@ -30,7 +33,7 @@ This is a small 2D simulation, not a full pathfinding system: people choose thei
 node --test tests/*.test.cjs
 ```
 
-Tests cover gravity, slope collisions, spring launches, ladder ascent, removing occupied supports, 36-object inventory, repeat timers, movement and undo, varied edge behavior, and ten simulated minutes at desktop and phone dimensions. `simulation.js` contains the physics and clocks; `world.js` draws the illustrations and handles browser input.
+Tests cover gravity, slope collisions, spring launches, ladder ascent, removing occupied supports, 36-object inventory, repeat timers, movement and undo, varied edge behavior, and ten simulated minutes at desktop and phone dimensions. `simulation.js` contains the physics and clocks; `illustrations.js` paints the six discoveries and controls their entrance springs and dissolves; `world.js` draws the world and connects browser input, music, and illustrations. Rendering tests cover overshoot, recoil, settling, variations, full-size dissolves, finite coordinates, bounded opacity, and balanced Canvas state.
 
 The application harness loads the actual HTML and audio distribution and checks Canvas drawing at desktop and phone dimensions, all six themes, real reveal events and repeats, synchronized visual entrances and ribbon gusts, pending entrances after theme changes, saved preferences, mute, pause, visibility, reset, undo, and restricted storage. It does not replace listening and visual testing in a real browser.
 

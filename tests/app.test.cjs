@@ -34,12 +34,13 @@ function boot(width=1440,height=900,{audio=false,muted=false,theme='default',blo
   const document=new Element(),window=new Element();
   document.querySelector=selector=>{const el=elements.find(el=>el.attrs.get('id')===selector.slice(1));assert.ok(el,`Missing HTML element ${selector}`);return el;};
   document.querySelectorAll=selector=>elements.filter(el=>selector[0]==='.'?el.classList.contains(selector.slice(1)):selector==='[data-tool]'&&!!el.dataset.tool);
-  const ctx={globalAlpha:1,calls:[],stack:[],save(){this.stack.push(this.globalAlpha);},restore(){this.globalAlpha=this.stack.pop();}};
+  const ctx={globalAlpha:1,calls:[],arcs:[],stack:[],save(){this.stack.push(this.globalAlpha);},restore(){this.globalAlpha=this.stack.pop();}};
   for(const name of ['setTransform','translate','scale','rotate','beginPath','closePath','moveTo','lineTo','bezierCurveTo','arc','ellipse','fillRect','fillText','clearRect','fill','stroke']){
     ctx[name]=function(...args){
       for(const value of args)if(typeof value==='number')assert.ok(Number.isFinite(value),`Non-finite ${name} coordinate`);
       assert.ok(this.globalAlpha>=0&&this.globalAlpha<=1,`Invalid opacity in ${name}`);
       if(name==='ellipse'&&this.globalAlpha>0)this.calls.push({color:this.fillStyle,args});
+      if(name==='arc')this.arcs.push({color:this.strokeStyle,args});
     };
   }
   ctx.createRadialGradient=(...args)=>{assert.ok(args.every(Number.isFinite));return {addColorStop(){}};};
@@ -50,12 +51,13 @@ function boot(width=1440,height=900,{audio=false,muted=false,theme='default',blo
   class World extends simulation.World{constructor(w,h){super(w,h,()=>.4);world=this;}}
   const context=vm.createContext({document,window,console,AudioContext:audio?AudioContext:undefined,localStorage,LittleWorld:{...simulation,World},requestAnimationFrame:fn=>{scheduled=fn;}});
   const scripts=[...html.matchAll(/<script src="([^"?]+)(?:\?[^"]*)?"><\/script>/g)].map(([,file])=>file);
-  assert.deepEqual(scripts,['simulation.js','vendor/wonder-audio/audio.js','world.js']);
+  assert.deepEqual(scripts,['simulation.js','vendor/wonder-audio/audio.js','illustrations.js','world.js']);
   vm.runInContext(fs.readFileSync(path.join(__dirname,'../',scripts[1]),'utf8'),context);
   const Base=context.WonderAudio.Soundtrack;
   context.WonderAudio.Soundtrack=class extends Base{constructor(options){super(options);sound=this;}};
-  vm.runInContext(fs.readFileSync(path.join(__dirname,'../',scripts[2]),'utf8'),context,{filename:'world.js'});
-  function frame(ms=100){ctx.calls=[];now+=ms;const fn=scheduled;assert.ok(fn);scheduled=null;fn(now);assert.equal(ctx.stack.length,0,'Canvas state is balanced');}
+  vm.runInContext(fs.readFileSync(path.join(__dirname,'../',scripts[2]),'utf8'),context,{filename:'illustrations.js'});
+  vm.runInContext(fs.readFileSync(path.join(__dirname,'../',scripts[3]),'utf8'),context,{filename:'world.js'});
+  function frame(ms=100){ctx.calls=[];ctx.arcs=[];now+=ms;const fn=scheduled;assert.ok(fn);scheduled=null;fn(now);assert.equal(ctx.stack.length,0,'Canvas state is balanced');}
   const click=selector=>document.querySelector(selector).dispatch('click');
   function populate(){world.people=[];for(let id=0;id<6;id++)assert.ok(world.place(id,40+id*(width-80)/6,180));}
   return {world,sound,document,window,canvas,ctx,storage,frame,click,populate};
@@ -82,7 +84,8 @@ test('real reveal events play all tunes and repeats, with mute, pause, visibilit
   const a=boot(1440,900,{audio:true});a.frame();assert.equal(a.sound.context,null);
   a.document.dispatch('pointerdown',{target:a.canvas});assert.equal(a.sound.context.state,'running');a.populate();
   for(let i=0;i<7;i++)a.frame();assert.equal(a.sound.voices.size,6);assert.equal(a.sound.buffers.size,6);
-  for(const t of a.world.tokens)t.timer=.01;a.frame();assert.equal(a.sound.voices.size,12);
+  for(const t of a.world.tokens)t.timer=.01;a.frame();assert.equal(a.sound.voices.size,9,'Repeats share accents while the first three phrases finish');
+  assert.equal([...a.sound.voiceInfo.values()].filter(info=>info.role==='phrase').length,3);
   a.click('#sound');assert.equal(a.sound.muted,true);assert.equal(a.sound.voices.size,0);
   assert.equal(a.document.querySelector('#sound').getAttribute('aria-pressed'),'true');
   for(const t of a.world.tokens)t.timer=.01;a.frame();assert.equal(a.sound.voices.size,0);
@@ -92,6 +95,16 @@ test('real reveal events play all tunes and repeats, with mute, pause, visibilit
   a.document.hidden=false;a.document.dispatch('visibilitychange');assert.equal(a.sound.context.state,'running');
   a.sound.playDiscovery({id:0});a.click('#undo');assert.equal(a.sound.voices.size,0);
   a.sound.playDiscovery({id:1});a.click('#clear');assert.equal(a.sound.voices.size,0);assert.equal(a.world.tokens.length,0);
+});
+
+test('tiny placed shapes keep generous invisible targets for dragging',()=>{
+  const a=boot();a.frame();a.world.people=[];const token=a.world.place(0,200,200);a.frame();
+  const circle=a.ctx.arcs.find(call=>call.color==='#e4d9c6');assert.ok(circle);assert.equal(circle.args[2],7);
+  // Start outside the visible seven-pixel radius, inside the existing drag target.
+  a.canvas.dispatch('pointerdown',{clientX:220,clientY:200});
+  a.canvas.dispatch('pointermove',{clientX:320,clientY:220});
+  a.canvas.dispatch('pointerup',{clientX:320,clientY:220});
+  assert.equal(token.x,300);assert.equal(token.y,220);
 });
 
 for(const theme of Object.keys(THEMES).filter(id=>id!=='default'))test(`${theme} updates pending entrances, repeats, future placements, and paused or muted playback`,()=>{
