@@ -432,7 +432,7 @@
         timeOffset:n.beat===0?0:feel(n.beat*17+id*7+variant)*.008};
     }).sort((a,b)=>a.beat-b.beat);
     if(role==='accent'){
-      const first=score[0];return [{...first,beat:0,duration:Math.min(.32,first.duration),volume:first.volume*.27,velocity:.38,timeOffset:0,kind:'accent'}];
+      const first=score[0];return [{...first,beat:0,duration:Math.min(.32*profile.bpm/60,first.duration),volume:first.volume*.65,velocity:.6,timeOffset:0,kind:'accent'}];
     }
     return score;
   }
@@ -463,6 +463,14 @@
       for(const [delay,level]of[[.019,.22],[.037,.14],[.061,.08]])data[Math.round((delay+c*.002)*rate)]+=level;
     }
     return buffer;
+  }
+
+  // Render a reusable note for samplers and offline embedded asset exporters.
+  function makeInstrument(context,voice,midi=72,duration=1.4,velocity=.7){
+    if(!Object.hasOwn(instruments,voice)||!Number.isFinite(midi)||!Number.isFinite(duration)||duration<=0)throw new RangeError('Invalid instrument note');
+    const rate=24000,release=voice==='grand'||voice==='feltPiano'?PIANO_RELEASE:0;
+    const buffer=context.createBuffer(2,Math.ceil((duration+release+.04)*rate),rate);
+    note(buffer,midi,0,duration,.25,voice,0,false,velocity);return buffer;
   }
 
   class Soundtrack {
@@ -564,14 +572,20 @@
     }
     discoveryRole(event,cue){
       const identity=Number.isInteger(event.tokenId)?`${event.id}:${event.tokenId}`:String(event.id);
-      const active=[...this.voiceInfo.values()].filter(info=>info.endsAt>cue.when);
-      const busy=active.filter(info=>info.role==='phrase').length;
-      const recent=[...this.phraseHistory.values()].filter(info=>cue.beat-info.beat<32);
       const last=this.phraseHistory.get(identity);
-      const oldest=recent.length?Math.min(...recent.map(info=>info.lastPhrase)):-Infinity;
-      const yieldTurn=last&&cue.beat-last.beat<32&&last.lastPhrase>oldest;
-      const duplicate=active.some(info=>info.id===event.id&&info.when===cue.when&&info.role==='phrase');
-      return {identity,role:busy>=this.maxPhrases||yieldTurn||duplicate?'accent':'phrase'};
+      const lastPhrase=last&&cue.beat-last.beat<32?last.lastPhrase:-Infinity;
+      const active=[...this.voiceInfo].filter(([,info])=>info.role==='phrase'&&info.endsAt>cue.when);
+      const duplicate=active.find(([,info])=>info.id===event.id&&info.when===cue.when);
+      let replace;
+      if(duplicate||active.length>=this.maxPhrases){
+        // Arbitrate actual contenders before their shared entrance, never
+        // reserve an empty slot or interrupt a phrase that is already audible.
+        for(const [source,info]of duplicate?[duplicate]:active){
+          if(info.when===cue.when&&info.when>this.context.currentTime+.008&&info.lastPhrase>lastPhrase&&
+            (!replace||info.lastPhrase>this.voiceInfo.get(replace).lastPhrase))replace=source;
+        }
+      }
+      return {identity,lastPhrase,replace,role:replace||!duplicate&&active.length<this.maxPhrases?'phrase':'accent'};
     }
     rememberPhrase(identity,role,beat){
       const lastPhrase=role==='phrase'?beat:(this.phraseHistory.get(identity)?.lastPhrase??-Infinity);
@@ -585,7 +599,7 @@
       const profile=themeFor(this.theme),cycle=Number.isInteger(event.cycle)?Math.max(0,event.cycle-1):0;
       const token=Number.isInteger(event.tokenId)?Math.max(0,event.tokenId):0;
       const variation=(cycle+token)%profile.variations;
-      let cue=this.nextEntrance(),buffer,prepared=false,choice;
+      let cue=this.nextEntrance(),buffer,accentBuffer,prepared=false,choice;
       for(let attempt=0;attempt<4;attempt++){
         const began=context.currentTime;choice=this.discoveryRole(event,cue);
         const existing=choice.role==='accent'?[...this.voiceInfo.values()].find(info=>info.role==='accent'&&info.id===event.id&&info.when===cue.when):null;
@@ -593,17 +607,41 @@
           this.rememberPhrase(choice.identity,'accent',cue.beat);
           return {...cue,variation,role:'accent',coalesced:true};
         }
-        const phase=Math.round(cue.beat*2)%((profile.harmony?.beats??profile.chords.length*4)*2);
-        const key=`${this.theme}:${event.id}:${phase}:v${variation}:${choice.role}`;
-        if(!this.buffers.has(key)){
-          if(this.buffers.size>=24)this.buffers.delete(this.buffers.keys().next().value);
-          this.buffers.set(key,makeTune(context,event.id,cue.beat,this.beatLength,this.theme,variation,choice.role));
+        buffer=this.discoveryBuffer(event.id,cue,variation,choice.role);
+        if(choice.replace){
+          const info=this.voiceInfo.get(choice.replace);
+          accentBuffer=this.discoveryBuffer(info.id,info.cue,info.cue.variation,'accent');
         }
-        buffer=this.buffers.get(key);
         if(cue.when>=context.currentTime+.008){prepared=true;break;}
         cue=this.nextEntrance(Math.max(.04,(context.currentTime-began)*1.5));
       }
       if(!prepared)return;
+      if(choice.replace){
+        const info=this.voiceInfo.get(choice.replace);
+        this.stopVoice(choice.replace,true);
+        // A provisional reservation did not earn a foreground turn.
+        this.phraseHistory.set(info.identity,{role:'accent',beat:info.cue.beat,lastPhrase:info.lastPhrase});
+        info.cue.role='accent';
+        const shared=[...this.voiceInfo.values()].some(other=>other.role==='accent'&&other.id===info.id&&other.when===info.when);
+        if(shared)info.cue.coalesced=true;
+        else this.startDiscovery(info.id,info.cue,{identity:info.identity,lastPhrase:info.lastPhrase,role:'accent'},accentBuffer);
+      }
+      const result={...cue,variation,role:choice.role};
+      this.startDiscovery(event.id,result,choice,buffer);
+      this.rememberPhrase(choice.identity,choice.role,cue.beat);
+      return result;
+    }
+    discoveryBuffer(id,cue,variation,role){
+      const profile=themeFor(this.theme),phase=Math.round(cue.beat*2)%((profile.harmony?.beats??profile.chords.length*4)*2);
+      const key=`${this.theme}:${id}:${phase}:v${variation}:${role}`;
+      if(!this.buffers.has(key)){
+        if(this.buffers.size>=24)this.buffers.delete(this.buffers.keys().next().value);
+        this.buffers.set(key,makeTune(this.context,id,cue.beat,this.beatLength,this.theme,variation,role));
+      }
+      return this.buffers.get(key);
+    }
+    startDiscovery(id,cue,choice,buffer){
+      const context=this.context;
       // Accents stay short and bounded; simultaneous copies share their accent.
       const accents=[...this.voiceInfo].filter(([,info])=>info.role==='accent'&&info.endsAt>cue.when);
       if(choice.role==='accent'&&accents.length>=8)this.stopVoice(accents[0][0]);
@@ -611,16 +649,15 @@
       const source=context.createBufferSource(),gain=context.createGain();
       source.buffer=buffer;gain.gain.value=choice.role==='phrase'?.62:.5;
       source.connect(gain);gain.connect(this.mix);this.voices.set(source,gain);
-      const result={...cue,variation,role:choice.role};
-      this.voiceInfo.set(source,{...choice,id:event.id,when:cue.when,endsAt:cue.when+buffer.duration,cue:result});
-      this.rememberPhrase(choice.identity,choice.role,cue.beat);
+      this.voiceInfo.set(source,{identity:choice.identity,lastPhrase:choice.lastPhrase,role:choice.role,id,when:cue.when,endsAt:cue.when+buffer.duration,cue});
       source.onended=()=>{source.disconnect();gain.disconnect();this.voices.delete(source);this.voiceInfo.delete(source);};
-      source.start(cue.when);return result;
+      source.start(cue.when);
     }
-    stopVoice(source){
+    stopVoice(source,immediate=false){
       const gain=this.voices.get(source);if(!gain)return;
-      const now=this.context.currentTime;gain.gain.setTargetAtTime(0,now,.008);
-      source.stop(now+.04);this.voices.delete(source);this.voiceInfo.delete(source);
+      const now=this.context.currentTime;
+      if(immediate)gain.gain.value=0;else gain.gain.setTargetAtTime(0,now,.008);
+      source.stop(immediate?now:now+.04);this.voices.delete(source);this.voiceInfo.delete(source);
     }
     clearEffects(){for(const source of this.voices.keys())this.stopVoice(source);this.phraseHistory.clear();}
     async dispose(){
@@ -633,5 +670,5 @@
       if(context&&context.state!=='closed')await context.close();
     }
   }
-  return {Soundtrack,makeMusic,makeTune,discoveryScore,composerScore,arrangementScore,makeRoom,grooveBeat,straightBeat,BEAT,CHORDS,THEMES};
+  return {Soundtrack,makeMusic,makeTune,makeInstrument,discoveryScore,composerScore,arrangementScore,makeRoom,grooveBeat,straightBeat,BEAT,CHORDS,THEMES};
 });
