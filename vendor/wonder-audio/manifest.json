@@ -1,8 +1,8 @@
 {
   "name": "wonder-audio",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "files": {
-    "audio.js": "ef2a86835d1992a89928bfc6779fc990926ed4d36f9bd45fc76bb6e9997b8c94",
-    "NOTICE.md": "4d9c1467f9c588d71b009e21c32e3b33f14bb8d6fe842d511fdbe93060141298"
+    "audio.js": "a190414c6f3dba364df46537dd10eba0c621318716134152b4d942d2c388fb4a",
+    "NOTICE.md": "6637cc8922b76a50c605db8d04f68609cfcf6db8c00d41e00aaad6f8a0468b55"
   }
 }

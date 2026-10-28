@@ -11,7 +11,7 @@
   const noise=n=>{const v=Math.sin(n*127.1+311.7)*43758.5453;return v-Math.floor(v);};
   const status=text=>document.querySelector('#status').textContent=text;
   const soundButton=document.querySelector('#sound'),themeSelect=document.querySelector('#music-theme');
-  const sound=new WonderAudio.Soundtrack({onChange:syncSound});
+  const sound=new WonderAudio.Soundtrack({onChange:syncSound,themeIds:WonderAudio.PLAYABLE_THEMES});
   function syncSound(){
     soundButton.disabled=!sound.supported;soundButton.setAttribute('aria-pressed',String(sound.muted));
     const label=!sound.supported?'Audio unavailable in this browser':sound.muted?'Unmute sound':'Mute sound';

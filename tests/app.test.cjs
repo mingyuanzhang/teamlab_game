@@ -6,7 +6,7 @@ const path=require('node:path');
 const vm=require('node:vm');
 const {createHash}=require('node:crypto');
 const simulation=require('../simulation.js');
-const {THEMES}=require('../vendor/wonder-audio/audio.js');
+const visibleThemes=['default','brubeck','metal','sky','platformer','tchaikovsky','moonlight','bounce','gaoshan','bach','chopin'];
 const {AudioContext}=require('./helpers/audio.cjs');
 class Element{
   constructor(attrs=''){
@@ -72,6 +72,22 @@ test('local distribution and asset hashes match the files loaded by the game',()
   for(const [file,expected]of Object.entries(manifest.files))assert.equal(createHash('sha256').update(fs.readFileSync(path.join(vendor,file))).digest('hex'),expected);
 });
 
+test('the music menu offers the eleven playground themes and hides archived genres',()=>{
+  const html=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8');
+  const choices=[...html.matchAll(/<option value="([^"]+)">([^<]+)<\/option>/g)];
+  assert.deepEqual(choices.map(([,id])=>id),visibleThemes);
+  assert.equal(choices.find(([,id])=>id==='brubeck')[2],'Brubeck');
+});
+
+test('saved archived themes return to Default without starting audio',()=>{
+  for(const theme of ['jazz','rock','classical','british','guzheng','paganini']){
+    const a=boot(1440,900,{audio:true,theme});
+    assert.equal(a.sound.theme,'default');assert.equal(a.sound.context,null);
+    assert.equal(a.document.querySelector('#music-theme').value,'default');
+    assert.equal(a.sound.setTheme(theme),false,'Archived genres cannot bypass the playground menu');
+  }
+});
+
 for(const width of [1440,390])test(`the actual 2D app renders all six discoveries at ${width}px without Web Audio`,()=>{
   const a=boot(width,844);a.frame();assert.equal(a.world.people.length,48);a.populate();
   assert.equal(a.document.querySelector('#sound').disabled,true);assert.equal(a.document.querySelector('#music-theme').disabled,true);
@@ -107,7 +123,7 @@ test('tiny placed shapes keep generous invisible targets for dragging',()=>{
   assert.equal(token.x,300);assert.equal(token.y,220);
 });
 
-for(const theme of Object.keys(THEMES).filter(id=>id!=='default'))test(`${theme} updates pending entrances, repeats, future placements, and paused or muted playback`,()=>{
+for(const theme of visibleThemes.filter(id=>id!=='default'))test(`${theme} updates pending entrances, repeats, future placements, and paused or muted playback`,()=>{
   const a=boot(1440,900,{audio:true});a.frame();a.document.dispatch('pointerdown',{target:a.canvas});a.populate();
   for(let i=0;i<7;i++)a.frame();const music=a.sound.music,voices=[...a.sound.voices.keys()];
   const select=a.document.querySelector('#music-theme');select.value=theme;select.dispatch('change');
